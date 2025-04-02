@@ -1,7 +1,4 @@
-# netlify.toml - Configuration file for Netlify
-
 [build]
-  command = "npm run build"
   publish = "public"
   functions = "functions"
 
@@ -10,15 +7,18 @@
   port = 8888
   targetPort = 3000
 
-# Environment variables are better set in the Netlify UI
-# But you can define defaults here
-
 [functions]
   node_bundler = "esbuild"
+  included_files = ["views/**"]
 
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/"
+  to = "/.netlify/functions/serve"
   status = 200
 
 [[redirects]]
