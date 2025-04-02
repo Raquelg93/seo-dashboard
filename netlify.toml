@@ -9,24 +9,13 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["views/**"]
 
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/"
+  from = "/dashboard"
   to = "/.netlify/functions/serve"
   status = 200
 
 [[redirects]]
-  from = "/dashboard"
-  to = "/.netlify/functions/serve-dashboard"
-  status = 200
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
   status = 200
