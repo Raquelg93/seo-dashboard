@@ -1,0 +1,83 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f8fa;
+    color: #333;
+}
+
+.card {
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    border: none;
+}
+
+.card-title {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    text-align: center;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    background: white;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.stat-card-title {
+    font-size: 14px;
+    color: #6c757d;
+    margin-bottom: 5px;
+}
+
+.stat-card-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #3498db;
+}
+
+.stat-card-change {
+    font-size: 12px;
+}
+
+.positive-change {
+    color: #2ecc71;
+}
+
+.negative-change {
+    color: #e74c3c;
+}
+
+.seo-check-item {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.seo-check-label {
+    display: inline-block;
+    width: 100%;
+    font-weight: 500;
+}
+
+.seo-check-value {
+    font-weight: normal;
+}
+
+.progress {
+    height: 8px;
+    margin-top: 5px;
+}
+
+.progress-good {
+    background-color: #2ecc71;
+}
+
+.progress-warning {
+    background-color: #f39c12;
+}
+
+.progress-bad {
+    background-color: #e74c3c;
+}

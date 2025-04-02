@@ -1,0 +1,31 @@
+{
+    "name": "seo-dashboard",
+    "version": "1.0.0",
+    "description": "Custom SEO dashboard application using GitHub and Netlify",
+    "main": "index.js",
+    "scripts": {
+        "dev": "netlify dev",
+        "build": "npm run copy-public",
+        "start": "node index.js",
+        "copy-public": "mkdir -p public && cp -r views public/ && cp -r public/views/css public/ && cp -r public/views/js public/ && rm -rf public/views"
+    },
+    "keywords": [
+        "seo",
+        "dashboard",
+        "netlify",
+        "serverless"
+    ],
+    "author": "Your Name",
+    "license": "MIT",
+    "dependencies": {
+        "cheerio": "^1.0.0-rc.12",
+        "dotenv": "^16.0.3",
+        "ejs": "^3.1.9",
+        "express": "^4.18.2",
+        "googleapis": "^118.0.0",
+        "node-fetch": "^2.6.9"
+    },
+    "devDependencies": {
+        "netlify-cli": "^15.0.0"
+    }
+}
