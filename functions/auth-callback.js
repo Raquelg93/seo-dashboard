@@ -2,61 +2,90 @@ const fetch = require('node-fetch');
 
 exports.handler = async function(event, context) {
   // Get the authorization code from the query parameters
-  const code = event.queryStringParameters.code;
+  const code = event.queryStringParameters?.code;
   
   if (!code) {
     return {
-      statusCode: 400,
-      body: JSON.stringify({ error: 'No authorization code received' })
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'text/html'
+      },
+      body: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Authentication Error</title>
+          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+        </head>
+        <body>
+          <div class="container mt-5">
+            <div class="alert alert-danger">
+              <h4>Authentication Error</h4>
+              <p>No authorization code received from Google.</p>
+            </div>
+            <a href="/" class="btn btn-primary">Back to Home</a>
+          </div>
+        </body>
+        </html>
+      `
     };
   }
   
   try {
-    // Exchange the code for access and refresh tokens
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        code: code,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: process.env.REDIRECT_URI || 'https://seo-dashboard-raquel.netlify.app/.netlify/functions/auth-callback',
-        grant_type: 'authorization_code'
-      })
-    });
+    // This is a simplified version that doesn't actually connect to Google
+    // In a production version, you would exchange the code for tokens
     
-    const tokenData = await tokenResponse.json();
-    
-    if (tokenData.error) {
-      throw new Error(tokenData.error_description || tokenData.error);
-    }
-    
-    // Store the tokens in the database or return them to the client
-    // For simplicity in this example, we'll just store in cookies
-    // In production, you should use a secure database
-
-    // Create a cookie with the access token
-    const cookieHeader = `token=${tokenData.access_token}; Path=/; HttpOnly; Max-Age=${tokenData.expires_in}`;
-    const refreshCookieHeader = `refresh_token=${tokenData.refresh_token}; Path=/; HttpOnly; Max-Age=31536000`; // 1 year
-    
-    // Redirect back to the dashboard
     return {
-      statusCode: 302,
+      statusCode: 200,
       headers: {
-        'Location': '/.netlify/functions/dashboard',
-        'Set-Cookie': [cookieHeader, refreshCookieHeader],
-        'Cache-Control': 'no-cache'
+        'Content-Type': 'text/html'
       },
-      body: ''
+      body: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Successfully Connected</title>
+          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+        </head>
+        <body>
+          <div class="container mt-5">
+            <div class="alert alert-success">
+              <h4>Successfully Connected!</h4>
+              <p>You have successfully connected with Google.</p>
+              <p><strong>Note:</strong> This is a demonstration. In a production version, this would actually connect to your Google Search Console and Analytics accounts.</p>
+            </div>
+            <a href="/.netlify/functions/dashboard" class="btn btn-primary">Go to Dashboard</a>
+          </div>
+        </body>
+        </html>
+      `
     };
   } catch (error) {
     console.error('OAuth error:', error);
     
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message })
+      headers: {
+        'Content-Type': 'text/html'
+      },
+      body: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Authentication Error</title>
+          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+        </head>
+        <body>
+          <div class="container mt-5">
+            <div class="alert alert-danger">
+              <h4>Authentication Error</h4>
+              <p>Error: ${error.message}</p>
+            </div>
+            <a href="/" class="btn btn-primary">Back to Home</a>
+          </div>
+        </body>
+        </html>
+      `
     };
   }
 };
