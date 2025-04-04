@@ -1,4 +1,9 @@
 exports.handler = async (event, context) => {
+  // Parse cookies to check authentication
+  const cookieHeader = event.headers.cookie || '';
+  const cookies = parseCookies(cookieHeader);
+  const isAuthenticated = !!cookies.access_token;
+  
   return {
     statusCode: 200,
     headers: {
@@ -41,29 +46,43 @@ exports.handler = async (event, context) => {
         </style>
       </head>
       <body>
- <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-  <div class="container">
-    <a class="navbar-brand" href="/">SEO Dashboard</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
-        <li class="nav-item">
-          <a class="nav-link" href="/">Home</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/.netlify/functions/dashboard">Dashboard</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/.netlify/functions/auth">Connect with Google</a>
-        </li>
-      </ul>
-    </div>
-  </div>
-</nav>
+       <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+          <a class="navbar-brand" href="/">SEO Dashboard</a>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+              <li class="nav-item">
+                <a class="nav-link" href="/">Home</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/.netlify/functions/dashboard">Dashboard</a>
+              </li>
+              ${isAuthenticated 
+                ? `<li class="nav-item"><a class="nav-link" href="/.netlify/functions/logout">Logout</a></li>`
+                : `<li class="nav-item"><a class="nav-link" href="/.netlify/functions/auth">Connect with Google</a></li>`
+              }
+            </ul>
+          </div>
+        </div>
+      </nav>
         <div class="container mt-4">
           <h1>SEO Dashboard</h1>
+          
+          ${!isAuthenticated ? `
+          <div class="alert alert-info mb-4">
+            <strong>Note:</strong> You are currently using the demo version. 
+            To access real Google Search Console and Analytics data, please 
+            <a href="/.netlify/functions/auth" class="alert-link">Connect with Google</a>.
+          </div>
+          ` : `
+          <div class="alert alert-success mb-4">
+            <strong>Connected!</strong> You are authenticated with Google. 
+            Your analysis will use real Search Console and Analytics data if available.
+          </div>
+          `}
           
           <div class="row mb-4">
             <div class="col-md-12">
@@ -225,7 +244,7 @@ exports.handler = async (event, context) => {
             
             html += '</div>'; // End row
             
-            // Search Console Mock Data section
+            // Search Console Data section
             if (data.searchConsole && data.searchConsole.data) {
               html += '<div class="card mt-4">';
               html += '<div class="card-body">';
@@ -265,10 +284,45 @@ exports.handler = async (event, context) => {
                 
                 html += '</tbody></table></div>';
                 
+                ${!isAuthenticated ? `
                 html += '<div class="alert alert-info mt-3">';
                 html += '<strong>Note:</strong> This is simulated search performance data for demonstration purposes. ';
-                html += 'In a production version, this would show real data from Google Search Console.';
+                html += 'Connect with Google to see real data from Search Console.';
                 html += '</div>';
+                ` : ''}
+              }
+              
+              html += '</div></div>';
+            }
+            
+            // Analytics data section (only shown when authenticated)
+            if (data.analytics && isAuthenticated) {
+              html += '<div class="card mt-4">';
+              html += '<div class="card-body">';
+              html += '<h5 class="card-title">Google Analytics Data</h5>';
+              
+              if (data.analytics.error) {
+                html += '<div class="alert alert-warning">' + data.analytics.error + '</div>';
+              } else if (data.analytics.rows && data.analytics.rows.length > 0) {
+                // Display analytics data
+                html += '<div class="table-responsive">';
+                html += '<table class="table table-sm">';
+                html += '<thead><tr><th>Source/Medium</th><th>Sessions</th><th>Users</th><th>Bounce Rate</th><th>Avg. Session Duration</th></tr></thead>';
+                html += '<tbody>';
+                
+                data.analytics.rows.forEach(row => {
+                  html += '<tr>';
+                  html += '<td>' + row[0] + '/' + row[1] + '</td>';
+                  html += '<td>' + row[2] + '</td>';
+                  html += '<td>' + row[3] + '</td>';
+                  html += '<td>' + row[4] + '%</td>';
+                  html += '<td>' + formatTime(row[5]) + '</td>';
+                  html += '</tr>';
+                });
+                
+                html += '</tbody></table></div>';
+              } else {
+                html += '<div class="alert alert-info">No Analytics data available for this URL.</div>';
               }
               
               html += '</div></div>';
@@ -325,6 +379,12 @@ exports.handler = async (event, context) => {
             return 'danger';
           }
           
+          function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.round(seconds % 60);
+            return mins + ':' + (secs < 10 ? '0' : '') + secs;
+          }
+          
           // Set up the form submission
           document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('analyze-form');
@@ -344,3 +404,18 @@ exports.handler = async (event, context) => {
     `,
   };
 };
+
+// Helper function to parse cookies
+function parseCookies(cookieHeader) {
+  const cookies = {};
+  if (!cookieHeader) return cookies;
+  
+  cookieHeader.split(';').forEach(cookie => {
+    const parts = cookie.split('=');
+    const name = parts.shift().trim();
+    const value = decodeURIComponent(parts.join('='));
+    cookies[name] = value;
+  });
+  
+  return cookies;
+}
