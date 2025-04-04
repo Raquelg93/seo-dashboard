@@ -1,255 +1,328 @@
 // functions/analyze.js
-const { google } = require('googleapis');
-const OAuth2 = google.auth.OAuth2;
 const fetch = require('node-fetch');
-const cheerio = require('cheerio');
 
-// Initialize OAuth2 client
-const oauth2Client = new OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.REDIRECT_URI
-);
-
-// Main function handler
-exports.handler = async function (event, context) {
-    // Only allow POST requests
-    if (event.httpMethod !== 'POST') {
-        return {
-            statusCode: 405,
-            body: JSON.stringify({ error: 'Method Not Allowed' })
-        };
+exports.handler = async function(event, context) {
+  // Only allow POST requests
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: 'Method Not Allowed' })
+    };
+  }
+  
+  try {
+    // Parse request body
+    const payload = JSON.parse(event.body);
+    const { url } = payload;
+    
+    if (!url) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'URL is required' })
+      };
     }
-
+    
+    // Extract domain from URL
+    const domain = new URL(url).hostname;
+    
+    // Perform basic SEO checks
+    const seoChecks = await performBasicSEOChecks(url);
+    
+    // Get mobile-friendliness from Google PageSpeed API (no auth required)
+    let pageSpeedData = {};
     try {
-        // Parse request body
-        const payload = JSON.parse(event.body);
-        const { url } = payload;
-
-        if (!url) {
-            return {
-                statusCode: 400,
-                body: JSON.stringify({ error: 'URL is required' })
-            };
-        }
-
-        // Check for token in cookies or headers
-        const token = getTokenFromRequest(event);
-
-        if (!token) {
-            return {
-                statusCode: 401,
-                body: JSON.stringify({ error: 'Authentication required' })
-            };
-        }
-
-        // Set token for API calls
-        oauth2Client.setCredentials(token);
-
-        // Get the domain from URL
-        const domain = new URL(url).hostname;
-
-        // Fetch data in parallel
-        const [searchConsoleData, analyticsData, seoChecks] = await Promise.all([
-            getSearchConsoleData(domain, oauth2Client),
-            getAnalyticsData(domain, oauth2Client),
-            performSeoChecks(url)
-        ]);
-
-        // Return combined results
-        return {
-            statusCode: 200,
-            body: JSON.stringify({
-                url,
-                domain,
-                searchConsole: searchConsoleData,
-                analytics: analyticsData,
-                seoChecks
-            })
-        };
-
-    } catch (error) {
-        console.error('Error in analyze function:', error);
-
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: error.message })
-        };
+      const pagespeedUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=mobile`;
+      const pagespeedResponse = await fetch(pagespeedUrl);
+      pageSpeedData = await pagespeedResponse.json();
+    } catch (e) {
+      console.log('PageSpeed API error:', e);
+      pageSpeedData = { error: 'Could not fetch PageSpeed data' };
     }
+    
+    // Process PageSpeed data
+    const performanceData = processPageSpeedData(pageSpeedData);
+    
+    // Mock search performance data
+    // In a real implementation, this would come from Google Search Console API
+    const searchPerformance = generateMockSearchData(url, domain);
+    
+    // Return all data
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        url,
+        domain,
+        seoChecks,
+        performanceData,
+        searchConsole: searchPerformance,
+        analysisDate: new Date().toISOString()
+      })
+    };
+  } catch (error) {
+    console.error('Error in analyze function:', error);
+    
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message })
+    };
+  }
 };
 
-// Helper function to get token from request
-function getTokenFromRequest(event) {
-    // In a real implementation, you would securely retrieve the token
-    // from cookies, headers, or a database
-
-    // For demo purposes, return a placeholder token
-    // In production, this should be properly implemented
+// Perform basic SEO checks
+async function performBasicSEOChecks(url) {
+  try {
+    // Fetch the website HTML
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SEODashboard/1.0; +https://seo-dashboard-raquel.netlify.app)'
+      }
+    });
+    const html = await response.text();
+    
+    // Check title
+    const titleMatch = html.match(/<title>(.*?)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim() : null;
+    
+    // Check meta description
+    const descriptionMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["'][^>]*>/i) || 
+                             html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["'][^>]*>/i);
+    const description = descriptionMatch ? descriptionMatch[1].trim() : null;
+    
+    // Check H1 tags
+    const h1Matches = html.match(/<h1[^>]*>(.*?)<\/h1>/gi);
+    const h1Count = h1Matches ? h1Matches.length : 0;
+    
+    // Extract H1 content
+    let h1Content = [];
+    if (h1Matches) {
+      h1Content = h1Matches.map(h => h.replace(/<\/?[^>]+(>|$)/g, "").trim());
+    }
+    
+    // Check images and alt text
+    const imgMatches = html.match(/<img[^>]*>/gi) || [];
+    const imgCount = imgMatches.length;
+    
+    // Count images with alt text
+    const imgWithAltCount = imgMatches.filter(img => img.match(/alt=["'][^"']*["']/i)).length;
+    
+    // Check canonical URL
+    const canonicalMatch = html.match(/<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']*)["'][^>]*>/i) ||
+                          html.match(/<link[^>]*href=["']([^"']*)["'][^>]*rel=["']canonical["'][^>]*>/i);
+    const canonicalUrl = canonicalMatch ? canonicalMatch[1] : null;
+    
+    // Check meta robots
+    const robotsMatch = html.match(/<meta[^>]*name=["']robots["'][^>]*content=["']([^"']*)["'][^>]*>/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']robots["'][^>]*>/i);
+    const robotsMeta = robotsMatch ? robotsMatch[1] : "index, follow"; // Default if not specified
+    
+    // Check heading structure
+    const h2Count = (html.match(/<h2[^>]*>.*?<\/h2>/gi) || []).length;
+    const h3Count = (html.match(/<h3[^>]*>.*?<\/h3>/gi) || []).length;
+    
+    // Check for schema markup
+    const hasSchemaMarkup = html.includes('application/ld+json') || 
+                            html.includes('itemtype="http://schema.org/') ||
+                            html.includes('itemtype="https://schema.org/');
+    
+    // Check for social meta tags
+    const hasOpenGraph = html.includes('property="og:') || html.includes('property=\'og:');
+    const hasTwitterCards = html.includes('name="twitter:') || html.includes('name=\'twitter:');
+    
+    // Check page size
+    const pageSize = html.length;
+    const pageSizeKB = Math.round(pageSize / 1024);
+    
+    // Return all checks
     return {
-        access_token: 'demo_token',
-        refresh_token: 'demo_refresh_token',
-        token_type: 'Bearer',
-        expiry_date: Date.now() + 3600000
+      title,
+      titleLength: title ? title.length : 0,
+      description,
+      descriptionLength: description ? description.length : 0,
+      h1Tags: h1Content,
+      h1Count,
+      h2Count,
+      h3Count,
+      headingStructure: {
+        h1: h1Count,
+        h2: h2Count,
+        h3: h3Count
+      },
+      imgCount,
+      imgWithAlt: imgWithAltCount,
+      imgWithoutAlt: imgCount - imgWithAltCount,
+      canonicalUrl,
+      robotsMeta,
+      hasSchemaMarkup,
+      socialTags: {
+        openGraph: hasOpenGraph,
+        twitterCards: hasTwitterCards
+      },
+      sslSecure: url.startsWith('https://'),
+      pageSize: pageSizeKB + ' KB',
+      checks: {
+        title: getTitleStatus(title),
+        description: getDescriptionStatus(description),
+        h1: getH1Status(h1Count),
+        imgAlt: getImgAltStatus(imgCount, imgWithAltCount),
+        ssl: getSslStatus(url.startsWith('https://')),
+        canonical: !!canonicalUrl,
+        schema: hasSchemaMarkup,
+        socialTags: hasOpenGraph || hasTwitterCards
+      }
     };
+  } catch (error) {
+    console.error('Error performing SEO checks:', error);
+    return { error: error.message };
+  }
 }
 
-// Helper function to get Search Console data
-async function getSearchConsoleData(domain, auth) {
-    try {
-        // In a real implementation, this would call the Search Console API
-        // Since we can't make actual API calls in this demo, return sample data
-
-        return {
-            siteUrl: `https://${domain}`,
-            data: {
-                rows: generateSampleSearchConsoleData()
-            }
-        };
-    } catch (error) {
-        console.error('Error fetching Search Console data:', error);
-        return { error: error.message };
-    }
+// Process PageSpeed data
+function processPageSpeedData(data) {
+  if (data.error) {
+    return { error: data.error };
+  }
+  
+  try {
+    // Extract key metrics if available
+    const metrics = data.lighthouseResult?.audits || {};
+    
+    return {
+      performance: data.lighthouseResult?.categories?.performance?.score || null,
+      firstContentfulPaint: metrics['first-contentful-paint']?.displayValue || 'n/a',
+      speedIndex: metrics['speed-index']?.displayValue || 'n/a',
+      largestContentfulPaint: metrics['largest-contentful-paint']?.displayValue || 'n/a',
+      timeToInteractive: metrics['interactive']?.displayValue || 'n/a',
+      totalBlockingTime: metrics['total-blocking-time']?.displayValue || 'n/a',
+      cumulativeLayoutShift: metrics['cumulative-layout-shift']?.displayValue || 'n/a',
+      mobileFriendly: !metrics['viewport']?.score || metrics['viewport']?.score === 1,
+      passed: {
+        viewport: metrics['viewport']?.score === 1,
+        https: metrics['is-on-https']?.score === 1,
+        robotsTxt: metrics['robots-txt']?.score === 1,
+        legibleFontSizes: metrics['font-size']?.score === 1
+      }
+    };
+  } catch (e) {
+    console.error('Error processing PageSpeed data:', e);
+    return { error: 'Failed to process performance data' };
+  }
 }
 
-// Helper function to get Analytics data
-async function getAnalyticsData(domain, auth) {
-    try {
-        // In a real implementation, this would call the Google Analytics API
-        // Since we can't make actual API calls in this demo, return sample data
-
-        return {
-            accountId: 'sample-account',
-            propertyId: 'sample-property',
-            viewId: 'sample-view',
-            data: {
-                rows: generateSampleAnalyticsData()
-            }
-        };
-    } catch (error) {
-        console.error('Error fetching Analytics data:', error);
-        return { error: error.message };
+// Generate mock search data to simulate Search Console
+function generateMockSearchData(url, domain) {
+  // Create realistic but mock data
+  const currentDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(currentDate.getDate() - 28);
+  
+  // Common search queries based on website type
+  const queries = [
+    domain.replace('www.', '') + ' reviews',
+    'how to ' + domain.split('.')[0],
+    domain.split('.')[0] + ' vs competitors',
+    'best ' + domain.split('.')[0] + ' services',
+    domain.split('.')[0] + ' discount',
+    domain.split('.')[0] + ' pricing',
+    'is ' + domain.split('.')[0] + ' worth it',
+    domain.split('.')[0] + ' alternatives',
+    'how does ' + domain.split('.')[0] + ' work',
+    domain.split('.')[0] + ' customer service'
+  ];
+  
+  // Generate random but plausible performance data for each query
+  const rows = queries.map(query => {
+    const impressions = Math.floor(Math.random() * 1000) + 100;
+    const ctr = Math.random() * 0.1 + 0.01; // CTR between 1-11%
+    const clicks = Math.floor(impressions * ctr);
+    const position = Math.random() * 15 + 1; // Position between 1-16
+    
+    return {
+      keys: [query, url, 'MOBILE', 'us'],
+      clicks,
+      impressions,
+      ctr,
+      position
+    };
+  });
+  
+  // Sort by clicks (highest first)
+  rows.sort((a, b) => b.clicks - a.clicks);
+  
+  // Generate day-by-day data for the main domain query
+  const dailyData = [];
+  for (let i = 0; i < 28; i++) {
+    const day = new Date(startDate);
+    day.setDate(startDate.getDate() + i);
+    
+    // Generate some trend with randomness
+    const dayFactor = 1 + (i / 28) * 0.5; // Gradual improvement over time
+    const randomFactor = 0.8 + Math.random() * 0.4; // Random variation
+    
+    const impressions = Math.floor(150 * dayFactor * randomFactor);
+    const ctr = (0.05 + (i / 28) * 0.02) * randomFactor; // Gradually improving CTR
+    const clicks = Math.floor(impressions * ctr);
+    const position = 8 - (i / 28) * 3 * randomFactor; // Gradually improving position
+    
+    dailyData.push({
+      date: day.toISOString().split('T')[0],
+      clicks,
+      impressions,
+      ctr,
+      position
+    });
+  }
+  
+  // Calculate totals
+  const totalClicks = rows.reduce((sum, row) => sum + row.clicks, 0);
+  const totalImpressions = rows.reduce((sum, row) => sum + row.impressions, 0);
+  const averageCtr = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
+  const averagePosition = rows.reduce((sum, row) => sum + row.position, 0) / rows.length;
+  
+  return {
+    siteUrl: url.startsWith('http') ? url : 'https://' + url,
+    data: {
+      rows,
+      dailyData,
+      totals: {
+        clicks: totalClicks,
+        impressions: totalImpressions,
+        ctr: averageCtr,
+        position: averagePosition
+      }
     }
+  };
 }
 
-// Helper function to perform SEO checks
-async function performSeoChecks(url) {
-    try {
-        // Fetch the page
-        const response = await fetch(url);
-        const html = await response.text();
-
-        // Parse HTML with cheerio
-        const $ = cheerio.load(html);
-
-        // Extract SEO elements
-        const title = $('title').text();
-        const description = $('meta[name="description"]').attr('content') || '';
-        const h1Elements = $('h1');
-        const imgElements = $('img');
-        const imgWithAlt = $('img[alt]');
-
-        // Check basic SEO factors
-        return {
-            title,
-            titleLength: title.length,
-            description,
-            descriptionLength: description.length,
-            h1Tags: h1Elements.map((i, el) => $(el).text()).get(),
-            h1Count: h1Elements.length,
-            imgTotal: imgElements.length,
-            imgWithoutAlt: imgElements.length - imgWithAlt.length,
-            sslSecure: url.startsWith('https://'),
-            // These would be from Lighthouse in a real implementation
-            pageSpeed: {
-                performance: Math.random() * 0.3 + 0.7, // Random score between 0.7-1.0
-                accessibility: Math.random() * 0.2 + 0.8, // Random score between 0.8-1.0
-                bestPractices: Math.random() * 0.2 + 0.8, // Random score between 0.8-1.0
-                seo: Math.random() * 0.1 + 0.9 // Random score between 0.9-1.0
-            }
-        };
-    } catch (error) {
-        console.error('Error performing SEO checks:', error);
-        return { error: error.message };
-    }
+// Helper functions to evaluate SEO elements
+function getTitleStatus(title) {
+  if (!title) return { status: 'error', message: 'Missing title tag' };
+  if (title.length < 30) return { status: 'warning', message: 'Title too short (less than 30 characters)' };
+  if (title.length > 60) return { status: 'warning', message: 'Title too long (more than 60 characters)' };
+  return { status: 'good', message: 'Title length is optimal' };
 }
 
-// Helper function to generate sample Search Console data
-function generateSampleSearchConsoleData() {
-    const keywords = [
-        'sample keyword 1',
-        'sample keyword 2',
-        'sample keyword 3',
-        'sample keyword 4',
-        'sample keyword 5'
-    ];
-
-    const pages = [
-        '/home',
-        '/about',
-        '/services',
-        '/blog',
-        '/contact'
-    ];
-
-    const devices = ['DESKTOP', 'MOBILE', 'TABLET'];
-    const countries = ['us', 'ca', 'uk', 'au', 'de'];
-
-    const rows = [];
-
-    // Generate sample data
-    for (let i = 0; i < 20; i++) {
-        const keyword = keywords[Math.floor(Math.random() * keywords.length)];
-        const page = pages[Math.floor(Math.random() * pages.length)];
-        const device = devices[Math.floor(Math.random() * devices.length)];
-        const country = countries[Math.floor(Math.random() * countries.length)];
-
-        const clicks = Math.floor(Math.random() * 100);
-        const impressions = clicks * (Math.floor(Math.random() * 10) + 5);
-        const ctr = (clicks / impressions) * 100;
-        const position = Math.random() * 10 + 1;
-
-        rows.push({
-            keys: [keyword, page, device, country],
-            clicks,
-            impressions,
-            ctr,
-            position
-        });
-    }
-
-    return rows;
+function getDescriptionStatus(description) {
+  if (!description) return { status: 'error', message: 'Missing meta description' };
+  if (description.length < 50) return { status: 'warning', message: 'Description too short (less than 50 characters)' };
+  if (description.length > 160) return { status: 'warning', message: 'Description too long (more than 160 characters)' };
+  return { status: 'good', message: 'Description length is optimal' };
 }
 
-// Helper function to generate sample Analytics data
-function generateSampleAnalyticsData() {
-    const rows = [];
-    const sources = ['google', 'bing', 'yahoo', 'duckduckgo'];
+function getH1Status(count) {
+  if (count === 0) return { status: 'error', message: 'Missing H1 tag' };
+  if (count > 1) return { status: 'warning', message: 'Multiple H1 tags (recommended to have just one)' };
+  return { status: 'good', message: 'H1 tag is properly used' };
+}
 
-    // Generate 14 days of data
-    for (let i = 0; i < 14; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateString = date.toISOString().split('T')[0].replace(/-/g, '');
+function getImgAltStatus(total, withAlt) {
+  if (total === 0) return { status: 'good', message: 'No images on page' };
+  if (withAlt === total) return { status: 'good', message: 'All images have alt text' };
+  if (withAlt / total >= 0.8) return { status: 'warning', message: 'Most images have alt text' };
+  return { status: 'error', message: 'Many images missing alt text' };
+}
 
-        for (const source of sources) {
-            const sessions = Math.floor(Math.random() * 100);
-            const users = Math.floor(sessions * 0.9);
-            const pageviews = Math.floor(sessions * (Math.random() + 2));
-            const bounceRate = (Math.random() * 50 + 30).toFixed(2);
-            const avgSessionDuration = Math.floor(Math.random() * 180 + 60);
-
-            rows.push([
-                dateString,
-                source,
-                'organic',
-                sessions.toString(),
-                users.toString(),
-                pageviews.toString(),
-                bounceRate,
-                avgSessionDuration.toString()
-            ]);
-        }
-    }
-
-    return rows;
+function getSslStatus(isSecure) {
+  return isSecure 
+    ? { status: 'good', message: 'Site is secure (HTTPS)' }
+    : { status: 'error', message: 'Site is not secure (HTTP)' };
 }
