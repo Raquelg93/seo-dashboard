@@ -41,25 +41,27 @@ exports.handler = async (event, context) => {
         </style>
       </head>
       <body>
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-          <div class="container">
-            <a class="navbar-brand" href="/">SEO Dashboard</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-              <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-              <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                  <a class="nav-link" href="/">Home</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link" href="/.netlify/functions/dashboard">Dashboard</a>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </nav>
-        
+ <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container">
+    <a class="navbar-brand" href="/">SEO Dashboard</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="/">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/.netlify/functions/dashboard">Dashboard</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/.netlify/functions/auth">Connect with Google</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
         <div class="container mt-4">
           <h1>SEO Dashboard</h1>
           
