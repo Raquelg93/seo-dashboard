@@ -1,25 +1,36 @@
-const fetch = require('node-fetch');
-
 exports.handler = async function(event, context) {
-  // Google OAuth configuration
-  const clientId = process.env.GOOGLE_CLIENT_ID || 'your-client-id';
-  const redirectUri = process.env.REDIRECT_URI || 'https://seo-dashboard-raquel.netlify.app/.netlify/functions/auth-callback';
+  // This is a simplified auth function
+  const redirectUrl = '/.netlify/functions/dashboard';
   
-  // Define the scopes we need
-  const scopes = [
-    'https://www.googleapis.com/auth/webmasters.readonly',
-    'https://www.googleapis.com/auth/analytics.readonly'
-  ];
-  
-  // Create the authorization URL
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&access_type=offline&prompt=consent`;
-  
-  // Redirect to Google's OAuth page
   return {
-    statusCode: 302,
+    statusCode: 200,
     headers: {
-      Location: authUrl
+      'Content-Type': 'text/html',
     },
-    body: ''
+    body: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Google Authentication</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+        <meta http-equiv="refresh" content="5;url=${redirectUrl}">
+      </head>
+      <body>
+        <div class="container mt-5">
+          <div class="card">
+            <div class="card-body text-center">
+              <h3 class="card-title">Google Authentication</h3>
+              <div class="alert alert-info">
+                <p>This is a demonstration version of the authentication flow.</p>
+                <p>In a production version, this would redirect you to Google's OAuth consent screen.</p>
+              </div>
+              <p>You'll be redirected to the dashboard in 5 seconds...</p>
+              <a href="${redirectUrl}" class="btn btn-primary">Go to Dashboard Now</a>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
   };
 };
