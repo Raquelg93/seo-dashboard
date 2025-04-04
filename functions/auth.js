@@ -1,7 +1,8 @@
 const fetch = require('node-fetch');
 
 exports.handler = async function(event, context) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+  // Google OAuth configuration
+  const clientId = process.env.GOOGLE_CLIENT_ID || 'your-client-id';
   const redirectUri = process.env.REDIRECT_URI || 'https://seo-dashboard-raquel.netlify.app/.netlify/functions/auth-callback';
   
   // Define the scopes we need
